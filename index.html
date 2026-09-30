@@ -603,7 +603,7 @@
       // ==========================================================
       // GOOGLE SHEETS TRACKING URL
       // ==========================================================
-      const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxVZWc1CKZ9eRv_TpAFxFpsZnF2mJG_a5DWuWvtpiLNQvfMigb1hSc0rOQglSVbezLS/exec';
+      const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwICg0KYdPDw1CYDvvRFskYbsaGkXYeUZu6dyIatqsk3pFt03a2DO1Ojdr6BcnSYqXv/exec';
 
       // ===== USER DATABASE =====
       const users = [
@@ -746,7 +746,7 @@
       }
 
       function sendToSheets(data) {exec
-        if (!GOOGLE_SHEETS_WEBAPP_URL || GOOGLE_SHEETS_WEBAPP_URL === 'https://script.google.com/macros/s/AKfycbxVZWc1CKZ9eRv_TpAFxFpsZnF2mJG_a5DWuWvtpiLNQvfMigb1hSc0rOQglSVbezLS/exec') {
+        if (!GOOGLE_SHEETS_WEBAPP_URL || GOOGLE_SHEETS_WEBAPP_URL === 'https://script.google.com/macros/s/AKfycbwICg0KYdPDw1CYDvvRFskYbsaGkXYeUZu6dyIatqsk3pFt03a2DO1Ojdr6BcnSYqXv/exec') {
           console.log('⚠️ Google Sheets URL not set!');
           return;
         }
@@ -780,7 +780,7 @@
             duration: duration,
             timestamp: now.toISOString()
           };
-          if (navigator.sendBeacon && GOOGLE_SHEETS_WEBAPP_URL && GOOGLE_SHEETS_WEBAPP_URL !== 'https://script.google.com/macros/s/AKfycbxVZWc1CKZ9eRv_TpAFxFpsZnF2mJG_a5DWuWvtpiLNQvfMigb1hSc0rOQglSVbezLS/exec') {
+          if (navigator.sendBeacon && GOOGLE_SHEETS_WEBAPP_URL && GOOGLE_SHEETS_WEBAPP_URL !== 'https://script.google.com/macros/s/AKfycbwICg0KYdPDw1CYDvvRFskYbsaGkXYeUZu6dyIatqsk3pFt03a2DO1Ojdr6BcnSYqXv/exec') {
             navigator.sendBeacon(GOOGLE_SHEETS_WEBAPP_URL, JSON.stringify(data));
           } else {
             sendToSheets(data);
