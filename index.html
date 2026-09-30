@@ -603,7 +603,7 @@
       // ==========================================================
       // GOOGLE SHEETS TRACKING URL
       // ==========================================================
-      const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbw8etCjYFMh1NnrwqaPTCnNsphb4R72xmI77wLFTfMtSdb1rA_U1sjcYRn4ocgT0gjQ8A/exec';
+      const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxVZWc1CKZ9eRv_TpAFxFpsZnF2mJG_a5DWuWvtpiLNQvfMigb1hSc0rOQglSVbezLS/exec';
 
       // ===== USER DATABASE =====
       const users = [
@@ -745,7 +745,7 @@
         console.log('📊 LOGOUT tracked:', data);
       }
 
-      function sendToSheets(data) {
+      function sendToSheets(data) {exec
         if (!GOOGLE_SHEETS_WEBAPP_URL || GOOGLE_SHEETS_WEBAPP_URL === 'https://script.google.com/macros/s/AKfycbxVZWc1CKZ9eRv_TpAFxFpsZnF2mJG_a5DWuWvtpiLNQvfMigb1hSc0rOQglSVbezLS/exec') {
           console.log('⚠️ Google Sheets URL not set!');
           return;
