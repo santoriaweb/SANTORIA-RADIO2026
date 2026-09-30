@@ -583,9 +583,27 @@
 
   <audio id="santoriaAudio" preload="auto"></audio>
 
+  <!-- EmailJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
   <script>
     (function() {
       'use strict';
+
+      // ==========================================================
+      // EMAILJS CONFIG
+      // ==========================================================
+      const EMAILJS_CONFIG = {
+        publicKey: 'YOUR_PUBLIC_KEY_HERE',
+        serviceID: 'YOUR_SERVICE_ID_HERE',
+        templateID: 'YOUR_TEMPLATE_ID_HERE'
+      };
+      emailjs.init(EMAILJS_CONFIG.publicKey);
+
+      // ==========================================================
+      // GOOGLE SHEETS TRACKING URL
+      // ==========================================================
+      const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbw8etCjYFMh1NnrwqaPTCnNsphb4R72xmI77wLFTfMtSdb1rA_U1sjcYRn4ocgT0gjQ8A/exec';
 
       // ===== USER DATABASE =====
       const users = [
@@ -661,6 +679,115 @@
       let isEnded = false;
       let isDragging = false;
       let audioReady = false;
+      let loginTimestamp = null;
+      let logoutTracked = false;
+
+      // ==========================================================
+      // EMAIL NOTIFICATION
+      // ==========================================================
+      function sendLoginNotification(user) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+        const templateParams = {
+          username: user.username,
+          welcome: user.welcome,
+          date: dateStr,
+          time: timeStr
+        };
+
+        emailjs.send(EMAILJS_CONFIG.serviceID, EMAILJS_CONFIG.templateID, templateParams)
+          .then(function(response) {
+            console.log('✅ Email notification sent successfully!', response);
+          }, function(error) {
+            console.log('❌ Failed to send email notification:', error);
+          });
+      }
+
+      // ==========================================================
+      // GOOGLE SHEETS TRACKING
+      // ==========================================================
+      function trackLogin(user) {
+        const now = new Date();
+        loginTimestamp = now;
+        const data = {
+          username: user.username,
+          date: now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+          day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+          action: 'LOGIN',
+          duration: '',
+          timestamp: now.toISOString()
+        };
+        sendToSheets(data);
+        console.log('📊 LOGIN tracked:', data);
+      }
+
+      function trackLogout(user) {
+        const now = new Date();
+        let duration = '';
+        if (loginTimestamp) {
+          const diffMs = now - loginTimestamp;
+          const diffMin = Math.floor(diffMs / 60000);
+          duration = diffMin + ' minutes';
+        }
+        const data = {
+          username: user.username,
+          date: now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+          day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+          action: 'LOGOUT',
+          duration: duration,
+          timestamp: now.toISOString()
+        };
+        sendToSheets(data);
+        console.log('📊 LOGOUT tracked:', data);
+      }
+
+      function sendToSheets(data) {
+        if (!GOOGLE_SHEETS_WEBAPP_URL || GOOGLE_SHEETS_WEBAPP_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+          console.log('⚠️ Google Sheets URL not set!');
+          return;
+        }
+        fetch(GOOGLE_SHEETS_WEBAPP_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).catch(error => {
+          console.log('📊 Tracking error:', error);
+        });
+      }
+
+      // ===== BEFOREUNLOAD (LOGOUT TRACK) =====
+      window.addEventListener('beforeunload', function() {
+        if (currentUser && !logoutTracked) {
+          logoutTracked = true;
+          const now = new Date();
+          let duration = '';
+          if (loginTimestamp) {
+            const diffMs = now - loginTimestamp;
+            const diffMin = Math.floor(diffMs / 60000);
+            duration = diffMin + ' minutes';
+          }
+          const data = {
+            username: currentUser.username,
+            date: now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+            day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+            action: 'LOGOUT',
+            duration: duration,
+            timestamp: now.toISOString()
+          };
+          if (navigator.sendBeacon && GOOGLE_SHEETS_WEBAPP_URL && GOOGLE_SHEETS_WEBAPP_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+            navigator.sendBeacon(GOOGLE_SHEETS_WEBAPP_URL, JSON.stringify(data));
+          } else {
+            sendToSheets(data);
+          }
+          console.log('📊 LOGOUT tracked (page close):', data);
+        }
+      });
 
       // ===== LOGIN =====
       function handleLogin(e) {
@@ -670,11 +797,18 @@
         const user = users.find(u => u.username === username && u.password === password);
         if (user) {
           currentUser = user;
+          logoutTracked = false;
           loginError.classList.remove('show');
           welcomeTitle.textContent = 'Welcome!';
           welcomeMessage.textContent = user.welcome;
           welcomeOverlay.classList.add('show');
           loginScreen.style.display = 'none';
+
+          // 📧 Send email notification
+          sendLoginNotification(user);
+
+          // 📊 Track login in Google Sheets
+          trackLogin(user);
         } else {
           loginError.textContent = 'Invalid username or password';
           loginError.classList.add('show');
@@ -688,16 +822,15 @@
         welcomeOverlay.classList.remove('show');
         radioPage.classList.add('show');
         if (currentUser) displayUsername.textContent = currentUser.username;
-        
+
         firstRun = true;
         currentTrackIndex = 0;
         isEnded = false;
         audioReady = false;
-        
+
         loadTrack(0);
         setVolume(0.8);
-        
-        // Wait for audio to be ready then play
+
         function tryPlay() {
           if (audio.readyState >= 2) {
             audio.play().then(() => {
@@ -736,11 +869,9 @@
         audioReady = false;
         updateStatusBadge();
 
-        // Set the source
         audio.src = track.src;
         audio.load();
 
-        // Wait for metadata
         audio.addEventListener('loadedmetadata', function onMeta() {
           if (audio.duration > 0) {
             totalTimeEl.textContent = formatTime(audio.duration);
@@ -749,7 +880,6 @@
           audio.removeEventListener('loadedmetadata', onMeta);
         });
 
-        // Also handle canplay
         audio.addEventListener('canplay', function onCanPlay() {
           if (audio.duration > 0) {
             totalTimeEl.textContent = formatTime(audio.duration);
@@ -778,9 +908,8 @@
       // ===== TOGGLE PLAY =====
       function togglePlay() {
         if (playlist.length === 0) return;
-        
+
         if (audio.paused) {
-          // If ended, load next
           if (audio.ended) {
             if (firstRun) {
               currentTrackIndex = 1;
@@ -800,8 +929,7 @@
             }, 100);
             return;
           }
-          
-          // Normal play
+
           audio.play().then(() => {
             isPlaying = true;
             playBtn.innerHTML = '<i class="fas fa-pause"></i>';
@@ -852,8 +980,7 @@
         const rect = progressBar.getBoundingClientRect();
         let x = (clientX - rect.left) / rect.width;
         x = Math.max(0, Math.min(1, x));
-        
-        // Only seek if audio has duration and is ready
+
         if (audio.duration && audio.duration > 0 && !isNaN(audio.duration)) {
           try {
             const newTime = x * audio.duration;
@@ -864,7 +991,6 @@
               return true;
             }
           } catch (e) {
-            // Silent fail - audio will continue playing
             return false;
           }
         }
@@ -875,15 +1001,11 @@
         e.preventDefault();
         e.stopPropagation();
         isDragging = true;
-        
+
         let clientX;
-        if (e.type === 'mousedown') {
-          clientX = e.clientX;
-        } else if (e.type === 'touchstart') {
-          clientX = e.touches[0].clientX;
-        } else {
-          return;
-        }
+        if (e.type === 'mousedown') clientX = e.clientX;
+        else if (e.type === 'touchstart') clientX = e.touches[0].clientX;
+        else return;
         seekTo(clientX);
       }
 
@@ -891,33 +1013,24 @@
         if (!isDragging) return;
         e.preventDefault();
         e.stopPropagation();
-        
+
         let clientX;
-        if (e.type === 'mousemove') {
-          clientX = e.clientX;
-        } else if (e.type === 'touchmove') {
-          clientX = e.touches[0].clientX;
-        } else {
-          return;
-        }
+        if (e.type === 'mousemove') clientX = e.clientX;
+        else if (e.type === 'touchmove') clientX = e.touches[0].clientX;
+        else return;
         seekTo(clientX);
       }
 
       function handleSeekEnd(e) {
         if (!isDragging) return;
         isDragging = false;
-        
+
         let clientX;
-        if (e.type === 'mouseup') {
-          clientX = e.clientX;
-        } else if (e.type === 'touchend') {
-          clientX = e.changedTouches[0].clientX;
-        } else {
-          return;
-        }
+        if (e.type === 'mouseup') clientX = e.clientX;
+        else if (e.type === 'touchend') clientX = e.changedTouches[0].clientX;
+        else return;
         seekTo(clientX);
-        
-        // Resume playing if it was playing before
+
         if (isPlaying && audio.paused) {
           audio.play().catch(() => {});
         }
@@ -947,10 +1060,9 @@
         setVolume(e.target.value);
       });
 
-      // Progress bar events
       progressBar.addEventListener('mousedown', handleSeekStart);
       progressBar.addEventListener('touchstart', handleSeekStart, { passive: false });
-      
+
       document.addEventListener('mousemove', handleSeekMove);
       document.addEventListener('mouseup', handleSeekEnd);
       document.addEventListener('touchmove', handleSeekMove, { passive: false });
@@ -974,7 +1086,7 @@
         }
 
         loadTrack(currentTrackIndex);
-        
+
         setTimeout(() => {
           audio.play().then(() => {
             isPlaying = true;
@@ -1007,10 +1119,11 @@
         setVolume(0.8);
       }
 
-      console.log('⚡ Santoria · 100% WORKING');
+      console.log('⚡ Santoria · 100% WORKING + TRACKING');
       console.log('✅ Progress bar works on ALL songs');
       console.log('✅ Audio never stops when seeking');
-      console.log('✅ Proper error handling throughout');
+      console.log('📧 Email notification on login');
+      console.log('📊 Google Sheets tracking (login + logout)');
       console.log('⌨️  Space = Play/Pause');
     })();
   </script>
